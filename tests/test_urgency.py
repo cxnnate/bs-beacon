@@ -29,6 +29,10 @@ def test_empty_message_not_flagged():
     assert check_urgency("") is False
 
 
+def test_none_message_not_flagged():
+    assert check_urgency(None) is False
+
+
 def test_combine_urgency_rules_true():
     assert combine_urgency(rules_result=True, llm_result=False) is True
 

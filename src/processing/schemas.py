@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional
 from enum import Enum
 
@@ -61,3 +61,8 @@ class ExtractionMeta(BaseModel):
 class ExtractionResult(BaseModel):
     claims: list[ExtractedClaim] = []
     meta: ExtractionMeta
+
+    @model_validator(mode='after')
+    def sync_claim_count(self) -> 'ExtractionResult':
+        self.meta = self.meta.model_copy(update={'claim_count': len(self.claims)})
+        return self

@@ -1,11 +1,11 @@
 URGENCY_KEYWORDS = [
     "breaking", "urgent", "share before deleted", "they don't want you to know",
     "wake up", "share now", "delete soon", "they're hiding", "cover up",
-    "before it's too late", "they are hiding", "wake up people",
+    "before it's too late",
 ]
 
 
-def check_urgency(text: str) -> bool:
+def check_urgency(text: str | None) -> bool:
     if not text:
         return False
 

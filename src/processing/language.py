@@ -1,4 +1,6 @@
-from langdetect import detect, LangDetectException
+from langdetect import detect, LangDetectException, DetectorFactory
+
+DetectorFactory.seed = 0
 
 
 def detect_language(text: str | None) -> str:
