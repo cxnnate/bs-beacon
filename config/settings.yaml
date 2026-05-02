@@ -1,0 +1,15 @@
+scraper:
+  poll_interval_seconds: 180
+  min_message_length: 20
+
+processor:
+  poll_interval_seconds: 30
+  batch_size: 20
+  max_failed_attempts: 3
+
+dedup:
+  similarity_threshold: 0.92
+
+urgency:
+  caps_ratio_threshold: 0.4
+  min_exclamation_marks: 3

@@ -1,0 +1,42 @@
+version: '3.9'
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bsbeacon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bsbeacon}
+      POSTGRES_DB: ${POSTGRES_DB:-bsbeacon}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bsbeacon"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  scraper:
+    build: .
+    command: python -m src.ingestion.scraper
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./config:/app/config
+      - ./.telegram_session:/app/.telegram_session
+
+  processor:
+    build: .
+    command: python -m src.processing.pipeline
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./config:/app/config
+
+volumes:
+  postgres_data:

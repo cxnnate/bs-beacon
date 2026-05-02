@@ -1,0 +1,10 @@
+channels:
+  health:
+    - username: "channelname1"
+      display_name: "Health Channel Placeholder 1"
+  politics:
+    - username: "channelname2"
+      display_name: "Politics Channel Placeholder 1"
+  global_affairs:
+    - username: "channelname3"
+      display_name: "Global Affairs Channel Placeholder 1"
