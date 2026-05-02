@@ -70,7 +70,11 @@ async def test_merge_claim_updates_occurrence_count(mock_session):
 
 @pytest.mark.asyncio
 async def test_insert_claim_returns_id(mock_session, sample_extraction_result):
-    mock_session.execute.return_value.fetchone.return_value = (99,)
+    first_result = MagicMock()
+    first_result.fetchone.return_value = (99,)
+    second_result = MagicMock()
+    mock_session.execute.side_effect = [first_result, second_result]
+
     claim = sample_extraction_result.claims[0]
     meta = sample_extraction_result.meta
     message = {"id": 1, "channel_name": "TestChannel", "message_date": datetime.now(timezone.utc)}

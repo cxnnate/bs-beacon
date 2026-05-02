@@ -9,6 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.processing.schemas import ExtractedClaim, ExtractionMeta
 
 
+def _embedding_to_pg(embedding: list[float]) -> str:
+    """Convert an embedding list to PostgreSQL vector format string."""
+    return "[" + ",".join(str(x) for x in embedding) + "]"
+
+
 def compute_text_hash(text_content: str) -> str:
     """Compute a normalized SHA256 hash of claim text.
 
@@ -49,7 +54,7 @@ async def find_similar_claim(
     Uses cosine similarity to find claims with embeddings similar to the given one.
     Returns the ID of the most similar claim above the threshold, or None.
     """
-    embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
+    embedding_str = _embedding_to_pg(embedding)
     result = await session.execute(
         text("""
         SELECT id
@@ -113,7 +118,7 @@ async def insert_claim(
     Returns the ID of the new claim.
     """
     now = datetime.now(timezone.utc)
-    embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
+    embedding_str = _embedding_to_pg(embedding)
     result = await session.execute(
         text("""
         INSERT INTO claims (
@@ -148,7 +153,10 @@ async def insert_claim(
             "embedding": embedding_str,
         },
     )
-    claim_id = result.fetchone()[0]
+    row = result.fetchone()
+    if row is None:
+        raise RuntimeError("INSERT INTO claims returned no id — RETURNING clause failed")
+    claim_id = row[0]
     await session.execute(
         text("""
         INSERT INTO claim_sources (claim_id, raw_message_id, channel_name, message_date)
