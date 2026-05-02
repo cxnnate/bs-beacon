@@ -71,8 +71,8 @@ def upgrade() -> None:
     op.execute("""
     CREATE TABLE claim_sources (
         id              BIGSERIAL PRIMARY KEY,
-        claim_id        BIGINT REFERENCES claims(id),
-        raw_message_id  BIGINT REFERENCES raw_messages(id),
+        claim_id        BIGINT REFERENCES claims(id) ON DELETE RESTRICT,
+        raw_message_id  BIGINT REFERENCES raw_messages(id) ON DELETE RESTRICT,
         channel_name    TEXT NOT NULL,
         message_date    TIMESTAMPTZ NOT NULL
     )
