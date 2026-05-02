@@ -11,3 +11,4 @@ build/
 .coverage
 htmlcov/
 .telegram_session/
+.DS_Store
