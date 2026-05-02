@@ -1,16 +1,23 @@
 import json
+import logging
 import os
+import re
 from pathlib import Path
 from typing import Protocol
 from anthropic import Anthropic
 
 from src.processing.schemas import ExtractionResult, ExtractionMeta, MessageType
 
+logger = logging.getLogger(__name__)
+
 _SYSTEM_PROMPT_PATH = Path(__file__).parent.parent.parent / "config" / "system_prompt.txt"
 
 
 def _load_system_prompt() -> str:
-    return _SYSTEM_PROMPT_PATH.read_text()
+    try:
+        return _SYSTEM_PROMPT_PATH.read_text()
+    except FileNotFoundError:
+        raise FileNotFoundError(f"System prompt not found at {_SYSTEM_PROMPT_PATH}")
 
 
 _FALLBACK_META = {
@@ -28,8 +35,8 @@ class LLMClient(Protocol):
         text: str,
         channel_name: str,
         message_date: str,
-        view_count: int,
-        forward_count: int,
+        view_count: int = 0,
+        forward_count: int = 0,
     ) -> ExtractionResult: ...
 
 
@@ -64,13 +71,13 @@ class ClaudeClient:
         )
 
         raw = response.content[0].text.strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1]
-            raw = raw.rsplit("```", 1)[0].strip()
+        raw = re.sub(r"^```[a-z]*\n?", "", raw)
+        raw = re.sub(r"\n?```$", "", raw).strip()
 
         try:
             return ExtractionResult.model_validate(json.loads(raw))
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to parse LLM response: %s", e, exc_info=True)
             return ExtractionResult(
                 claims=[],
                 meta=ExtractionMeta(**_FALLBACK_META),
