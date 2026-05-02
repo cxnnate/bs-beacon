@@ -10,6 +10,7 @@ pydantic>=2.0
 pgvector>=0.3
 python-dotenv>=1.0
 pyyaml>=6.0
+numpy>=1.26
 pytest>=8.0
 pytest-asyncio>=0.23
 pytest-mock>=3.12
