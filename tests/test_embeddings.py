@@ -34,3 +34,17 @@ def test_same_text_similarity_is_one():
     v1 = embedder.embed(text)
     v2 = embedder.embed(text)
     assert abs(embedder.cosine_similarity(v1, v2) - 1.0) < 0.001
+
+
+def test_embed_empty_string_raises():
+    import pytest
+    embedder = Embedder()
+    with pytest.raises(ValueError, match="non-empty"):
+        embedder.embed("")
+
+
+def test_embed_whitespace_only_raises():
+    import pytest
+    embedder = Embedder()
+    with pytest.raises(ValueError, match="non-empty"):
+        embedder.embed("   ")

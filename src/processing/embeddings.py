@@ -15,11 +15,15 @@ class Embedder:
         self._model = _get_model()
 
     def embed(self, text: str) -> list[float]:
+        if not text or not text.strip():
+            raise ValueError("embed() requires non-empty text")
         vec = self._model.encode(text, normalize_embeddings=True)
         return vec.tolist()
 
     @staticmethod
     def cosine_similarity(v1: list[float], v2: list[float]) -> float:
+        if len(v1) != len(v2):
+            raise ValueError(f"Vector length mismatch: {len(v1)} vs {len(v2)}")
         a = np.array(v1)
         b = np.array(v2)
         return float(np.dot(a, b))  # Vectors are already L2-normalized
