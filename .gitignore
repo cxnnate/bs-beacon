@@ -1,6 +1,6 @@
 venv/
 .env
-.DS_Store
+**/.DS_Store
 __pycache__/
 *.pyc
 *.pyo
@@ -11,4 +11,3 @@ build/
 .coverage
 htmlcov/
 .telegram_session/
-.DS_Store
