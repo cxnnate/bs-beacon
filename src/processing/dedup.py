@@ -33,9 +33,8 @@ async def find_by_text_hash(
     """
     result = await session.execute(
         text("""
-        SELECT rm.id FROM raw_messages rm
-        JOIN claim_sources cs ON cs.raw_message_id = rm.id
-        WHERE rm.text_hash = :hash AND rm.processed = TRUE AND rm.id != :exclude_id
+        SELECT id FROM raw_messages
+        WHERE text_hash = :hash AND processed = TRUE AND id != :exclude_id
         LIMIT 1
         """),
         {"hash": text_hash, "exclude_id": exclude_id},
