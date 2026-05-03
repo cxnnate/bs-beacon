@@ -23,7 +23,7 @@ def load_channels(path: str | None = None) -> list[dict]:
     with open(p) as f:
         data = yaml.safe_load(f)
     channels = []
-    for domain, channel_list in data["channels"].items():
+    for domain, channel_list in data.get("channels", {}).items():
         for ch in channel_list:
             channels.append({
                 "username": ch["username"],
@@ -111,8 +111,8 @@ async def fetch_channel(
         logger.warning(f"Rate limited on {username}, sleeping {e.seconds}s")
         await asyncio.sleep(e.seconds)
         return 0
-    except Exception as e:
-        logger.error(f"Error fetching {username}: {e}")
+    except Exception:
+        logger.exception(f"Error fetching {username}")
         return 0
 
 
@@ -131,6 +131,7 @@ async def run_scraper() -> None:
         while True:
             async with AsyncSessionLocal() as session:
                 for channel in channels:
+                    # Phase 3: populate with resolved entity IDs to skip cross-channel forwards
                     count = await fetch_channel(client, session, channel, set())
                     if count:
                         logger.info(f"Stored {count} messages from {channel['display_name']}")
