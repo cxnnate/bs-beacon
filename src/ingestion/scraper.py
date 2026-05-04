@@ -130,6 +130,10 @@ async def run_scraper() -> None:
     api_hash = os.environ["TELEGRAM_API_HASH"]
     session_name = os.getenv("TELEGRAM_SESSION_NAME", "bsbeacon")
 
+    async with AsyncSessionLocal() as session:
+        await session.execute(text("SELECT 1"))
+        logger.info("DB connection OK")
+
     async with TelegramClient(session_name, api_id, api_hash) as client:
         logger.info(f"Scraper started — monitoring {len(channels)} channels")
 

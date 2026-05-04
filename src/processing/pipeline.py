@@ -138,6 +138,8 @@ async def run_pipeline() -> None:
     embedder = Embedder()
 
     async with AsyncSessionLocal() as session:
+        await session.execute(sql_text("SELECT 1"))
+        logger.info("DB connection OK")
         result = await session.execute(
             sql_text("SELECT count(*) FROM raw_messages WHERE processed = FALSE AND message_text IS NOT NULL AND length(message_text) >= 20")
         )
