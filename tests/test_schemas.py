@@ -68,15 +68,15 @@ def test_checkworthy_score_below_zero_raises():
         )
 
 
-def test_invalid_category_raises():
-    with pytest.raises(ValidationError):
-        ExtractedClaim(
-            text="test claim",
-            entities=ClaimEntities(),
-            category="not_a_category",
-            temporal=Temporality.past,
-            checkworthy_score=0.5,
-        )
+def test_unknown_category_coerced_to_other():
+    claim = ExtractedClaim(
+        text="test claim",
+        entities=ClaimEntities(),
+        category="history",
+        temporal=Temporality.past,
+        checkworthy_score=0.5,
+    )
+    assert claim.category == ClaimCategory.other
 
 
 def test_entities_default_to_empty_lists():

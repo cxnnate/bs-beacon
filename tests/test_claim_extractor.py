@@ -82,6 +82,19 @@ def test_extract_strips_markdown_fences():
         assert len(result.claims) == 1
 
 
+def test_extract_empty_content_returns_fallback():
+    with patch("src.processing.claim_extractor.Anthropic") as MockAnthropic:
+        mock_response = MagicMock()
+        mock_response.content = []
+        mock_response.stop_reason = "max_tokens"
+        MockAnthropic.return_value.messages.create.return_value = mock_response
+        client = ClaudeClient()
+        result = client.extract("Some message", "TestChannel", "2026-01-01", 0, 0)
+        assert isinstance(result, ExtractionResult)
+        assert result.claims == []
+        assert result.meta.message_type == MessageType.unclear
+
+
 def test_make_llm_client_returns_claude_client():
     with patch.dict("os.environ", {"LLM_PROVIDER": "claude"}):
         with patch("src.processing.claim_extractor.Anthropic"):

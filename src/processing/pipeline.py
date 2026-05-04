@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -63,6 +64,7 @@ async def should_abandon(session, msg_id: int, max_attempts: int = 3) -> bool:
 async def process_message(session, message: dict, llm_client: LLMClient, embedder: Embedder) -> None:
     msg_id = message["id"]
     msg_text = message["message_text"]
+    channel = message["channel_name"]
 
     source_language = detect_language(msg_text)
 
@@ -74,6 +76,7 @@ async def process_message(session, message: dict, llm_client: LLMClient, embedde
 
     existing_msg_id = await find_by_text_hash(session, text_hash, exclude_id=msg_id)
     if existing_msg_id:
+        logger.info(f"[{channel}] msg {msg_id}: duplicate of msg {existing_msg_id} (text-hash match) — copying claims")
         await copy_claims_from_message(
             session, existing_msg_id, msg_id,
             message["channel_name"], message["message_date"],
@@ -93,14 +96,34 @@ async def process_message(session, message: dict, llm_client: LLMClient, embedde
 
     urgency = combine_urgency(rules_urgent, extraction.meta.urgency_signals)
 
+    if not extraction.claims:
+        logger.info(f"[{channel}] msg {msg_id}: no claims extracted (lang={source_language})")
+        await mark_processed(session, msg_id)
+        return
+
+    new_count = merged_count = 0
     for claim in extraction.claims:
         embedding = embedder.embed(claim.text)
         similar_id = await find_similar_claim(session, embedding)
         if similar_id:
             await merge_claim(session, similar_id, msg_id, message["channel_name"], message["message_date"])
+            merged_count += 1
+            action = "merged"
         else:
             await insert_claim(session, claim, embedding, source_language, urgency, extraction.meta, message)
+            new_count += 1
+            action = "new"
+        if len(claim.text.split()) <= 25:
+            logger.info(f"  [{action}] \"{claim.text}\"")
 
+    intake = message["message_date"]
+    intake_str = intake.strftime("%Y-%m-%d %H:%M UTC") if hasattr(intake, "strftime") else str(intake)
+    processed_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    logger.info(
+        f"[{channel}] msg {msg_id}: {len(extraction.claims)} claim(s) — "
+        f"{new_count} new, {merged_count} merged "
+        f"(lang={source_language}, urgent={urgency}, intake={intake_str}, processed={processed_str})"
+    )
     await mark_processed(session, msg_id)
 
 
@@ -114,14 +137,22 @@ async def run_pipeline() -> None:
     llm_client = make_llm_client()
     embedder = Embedder()
 
-    logger.info("Processor started")
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            sql_text("SELECT count(*) FROM raw_messages WHERE processed = FALSE AND message_text IS NOT NULL AND length(message_text) >= 20")
+        )
+        queued = result.scalar()
+    logger.info(f"Processor started — {queued} message(s) queued for processing")
 
     while True:
         async with AsyncSessionLocal() as session:
             batch = await fetch_batch(session, batch_size)
+            if not batch:
+                logger.info("No unprocessed messages — sleeping")
             for message in batch:
                 msg_id = message["id"]
                 if await should_abandon(session, msg_id, max_attempts):
+                    logger.warning(f"[{message['channel_name']}] msg {msg_id}: abandoning after {max_attempts} failed attempts")
                     await mark_processed(session, msg_id)
                     await session.commit()
                     continue

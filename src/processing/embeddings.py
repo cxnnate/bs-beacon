@@ -17,7 +17,7 @@ class Embedder:
     def embed(self, text: str) -> list[float]:
         if not text or not text.strip():
             raise ValueError("embed() requires non-empty text")
-        vec = self._model.encode(text, normalize_embeddings=True)
+        vec = self._model.encode(text, normalize_embeddings=True, show_progress_bar=False)
         return vec.tolist()
 
     @staticmethod

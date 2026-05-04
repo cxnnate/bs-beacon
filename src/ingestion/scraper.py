@@ -104,6 +104,10 @@ async def fetch_channel(
             await store_messages(session, messages)
             new_last_id = max(m["telegram_msg_id"] for m in messages)
             await update_last_id(session, channel_id, channel_name, new_last_id)
+            dates = [m["message_date"] for m in messages]
+            oldest = min(dates).strftime("%Y-%m-%d %H:%M UTC")
+            newest = max(dates).strftime("%Y-%m-%d %H:%M UTC")
+            logger.info(f"[{channel_name}] ingested {len(messages)} message(s) [{oldest} → {newest}]")
 
         return len(messages)
 
@@ -128,14 +132,25 @@ async def run_scraper() -> None:
 
     async with TelegramClient(session_name, api_id, api_hash) as client:
         logger.info(f"Scraper started — monitoring {len(channels)} channels")
+
+        async with AsyncSessionLocal() as session:
+            for channel in channels:
+                entity = await client.get_entity(channel["username"])
+                last_id = await get_last_id(session, entity.id)
+                logger.info(
+                    f"  {channel['display_name']}: resuming from message id={last_id} "
+                    f"({'first run' if last_id == 0 else 'checkpoint restored'})"
+                )
+
         while True:
             async with AsyncSessionLocal() as session:
                 for channel in channels:
                     # Phase 3: populate with resolved entity IDs to skip cross-channel forwards
                     count = await fetch_channel(client, session, channel, set())
-                    if count:
-                        logger.info(f"Stored {count} messages from {channel['display_name']}")
+                    if not count:
+                        logger.info(f"[{channel['display_name']}] no new messages")
                 await session.commit()
+            logger.info(f"Poll complete — sleeping {poll_interval}s")
             await asyncio.sleep(poll_interval)
 
 

@@ -65,10 +65,14 @@ class ClaudeClient:
 
         response = self._client.messages.create(
             model=self._model,
-            max_tokens=2000,
+            max_tokens=4096,
             system=self._system_prompt,
             messages=[{"role": "user", "content": user_prompt}],
         )
+
+        if not response.content:
+            logger.warning("LLM returned empty content (stop_reason=%s)", response.stop_reason)
+            return ExtractionResult(claims=[], meta=ExtractionMeta(**_FALLBACK_META))
 
         raw = response.content[0].text.strip()
         raw = re.sub(r"^```[a-z]*\n?", "", raw)

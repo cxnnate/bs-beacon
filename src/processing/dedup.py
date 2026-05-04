@@ -46,7 +46,7 @@ async def find_by_text_hash(
 async def find_similar_claim(
     session: AsyncSession,
     embedding: list[float],
-    threshold: float = 0.92,
+    threshold: float = 0.85,
 ) -> Optional[int]:
     """Find a semantically similar claim using pgvector.
 

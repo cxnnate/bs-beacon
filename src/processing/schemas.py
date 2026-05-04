@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Optional
 from enum import Enum
 
@@ -48,6 +48,13 @@ class ExtractedClaim(BaseModel):
     temporal: Temporality = Temporality.unspecified
     checkworthy_score: float = Field(ge=0.0, le=1.0)
     source_attribution: Optional[str] = None
+
+    @field_validator('category', mode='before')
+    @classmethod
+    def coerce_category(cls, v: object) -> object:
+        if isinstance(v, str) and v not in {e.value for e in ClaimCategory}:
+            return ClaimCategory.other.value
+        return v
 
 
 class ExtractionMeta(BaseModel):
