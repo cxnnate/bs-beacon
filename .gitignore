@@ -11,3 +11,7 @@ build/
 .coverage
 htmlcov/
 .telegram_session/
+.claude/
+CLAUDE.md
+PLAN.md
+docs/superpowers/
