@@ -9,6 +9,11 @@ security = HTTPBasic()
 def require_auth(credentials: HTTPBasicCredentials = Depends(security)) -> str:
     expected_user = os.getenv("API_USERNAME", "")
     expected_pass = os.getenv("API_PASSWORD", "")
+    if not expected_user or not expected_pass:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="API auth not configured",
+        )
     ok_user = secrets.compare_digest(credentials.username.encode(), expected_user.encode())
     ok_pass = secrets.compare_digest(credentials.password.encode(), expected_pass.encode())
     if not (ok_user and ok_pass):
