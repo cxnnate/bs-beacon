@@ -19,5 +19,7 @@ app.add_middleware(
 )
 
 from src.api.routes import claims as claims_router
+from src.api.routes import stats as stats_router
 
 app.include_router(claims_router.router, prefix="/api")
+app.include_router(stats_router.router, prefix="/api")
