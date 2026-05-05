@@ -41,5 +41,18 @@ services:
       - ./config:/app/config
     restart: unless-stopped
 
+  bsbeacon-api:
+    container_name: bsbeacon-api
+    build: .
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./config:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
 volumes:
   postgres_data:
