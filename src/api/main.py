@@ -17,3 +17,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+from src.api.routes import claims as claims_router
+
+app.include_router(claims_router.router, prefix="/api")
