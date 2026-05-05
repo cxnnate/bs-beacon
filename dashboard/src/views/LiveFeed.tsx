@@ -1,8 +1,9 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import type { Claim, Credentials } from '../types';
 import { useWebSocket } from '../ws';
 import { getClaims } from '../api';
 import ClaimCard from '../components/ClaimCard';
+import ChannelFilter from '../components/ChannelFilter';
 
 interface Props {
   creds: Credentials;
@@ -12,6 +13,7 @@ export default function LiveFeed({ creds }: Props) {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedChannels, setSelectedChannels] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     getClaims({ page_size: 50 }, creds)
@@ -32,6 +34,21 @@ export default function LiveFeed({ creds }: Props) {
   function updateClaim(updated: Claim) {
     setClaims((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
   }
+
+  const allChannels = useMemo(() => {
+    const seen = new Set<string>();
+    for (const c of claims) {
+      for (const ch of c.channels) seen.add(ch);
+    }
+    return Array.from(seen).sort();
+  }, [claims]);
+
+  const visibleClaims = useMemo(() =>
+    selectedChannels.size === 0
+      ? claims
+      : claims.filter((c) => c.channels.some((ch) => selectedChannels.has(ch))),
+    [claims, selectedChannels],
+  );
 
   if (loading) {
     return (
@@ -58,10 +75,23 @@ export default function LiveFeed({ creds }: Props) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '800px' }}>
-      {claims.map((c) => (
-        <ClaimCard key={c.id} claim={c} creds={creds} onUpdate={updateClaim} />
-      ))}
+    <div style={{ maxWidth: '800px' }}>
+      <ChannelFilter
+        channels={allChannels}
+        selected={selectedChannels}
+        onChange={setSelectedChannels}
+      />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {visibleClaims.length === 0 ? (
+          <div style={{ color: 'var(--muted)', paddingTop: '24px', textAlign: 'center' }}>
+            No claims from selected channels
+          </div>
+        ) : (
+          visibleClaims.map((c) => (
+            <ClaimCard key={c.id} claim={c} creds={creds} onUpdate={updateClaim} />
+          ))
+        )}
+      </div>
     </div>
   );
 }
