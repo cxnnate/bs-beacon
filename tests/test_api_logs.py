@@ -15,20 +15,20 @@ def override_auth():
 
 
 async def test_get_logs_scraper(mocker):
-    mock_run = mocker.patch("src.api.routes.logs.subprocess.run")
-    mock_run.return_value = MagicMock(stdout="[14:03] DB connection OK\n", stderr="")
+    mock_container = MagicMock()
+    mock_container.logs.return_value = b"[14:03] DB connection OK\n"
+
+    mock_client = MagicMock()
+    mock_client.containers.get.return_value = mock_container
+    mocker.patch("src.api.routes.logs.docker_sdk.from_env", return_value=mock_client)
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.get("/api/logs/scraper")
 
     assert resp.status_code == 200
     assert "DB connection OK" in resp.text
-    mock_run.assert_called_once_with(
-        ["docker", "logs", "--tail", "30", "bsbeacon-scraper"],
-        capture_output=True,
-        text=True,
-        timeout=10,
-    )
+    mock_client.containers.get.assert_called_once_with("bsbeacon-scraper")
+    mock_container.logs.assert_called_once_with(tail=30, stdout=True, stderr=True)
 
 
 async def test_get_logs_unknown_service_returns_400():
