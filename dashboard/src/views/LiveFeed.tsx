@@ -11,11 +11,12 @@ interface Props {
 export default function LiveFeed({ creds }: Props) {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getClaims({ page_size: 50 }, creds)
-      .then((res) => setClaims(res.items))
-      .catch(() => {})
+      .then((res) => { setClaims(res.items); setError(null); })
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setLoading(false));
   }, [creds]);
 
@@ -36,6 +37,14 @@ export default function LiveFeed({ creds }: Props) {
     return (
       <div style={{ color: 'var(--muted)', paddingTop: '40px', textAlign: 'center' }}>
         Loading…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ color: 'var(--urgent)', paddingTop: '40px', textAlign: 'center', fontSize: '13px' }}>
+        Failed to load claims: {error}
       </div>
     );
   }

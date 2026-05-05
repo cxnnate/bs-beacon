@@ -45,7 +45,7 @@ export default function Sidebar({ view, onNavigate, stats }: Props) {
       flexDirection: 'column',
       gap: '2px',
       flexShrink: 0,
-      height: '100vh',
+      height: '100%',
       overflow: 'auto',
     }}>
       {NAV.map(({ id, label }) => (

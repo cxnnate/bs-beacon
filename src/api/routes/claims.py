@@ -9,6 +9,22 @@ from src.db.connection import AsyncSessionLocal
 
 router = APIRouter()
 
+_CLAIM_COLS = """
+    c.id,
+    c.claim_text,
+    COALESCE(c.category, 'unknown')        AS category,
+    COALESCE(c.temporal, 'unknown')        AS temporal,
+    COALESCE(c.checkworthy_score, 0.0)     AS checkworthy_score,
+    c.source_attribution,
+    COALESCE(c.urgency_signals, false)     AS urgency_signals,
+    COALESCE(c.occurrence_count, 1)        AS occurrence_count,
+    COALESCE(c.status, 'unreviewed')       AS status,
+    c.first_seen_at,
+    c.last_seen_at,
+    ARRAY_AGG(DISTINCT cs.channel_name)
+      FILTER (WHERE cs.channel_name IS NOT NULL) AS channels
+"""
+
 
 @router.get("/claims", response_model=ClaimsListResponse)
 async def list_claims(
@@ -37,11 +53,7 @@ async def list_claims(
     where = ("WHERE " + " AND ".join(filters)) if filters else ""
 
     data_query = f"""
-        SELECT c.id, c.claim_text, c.category, c.temporal, c.checkworthy_score,
-               c.source_attribution, c.urgency_signals, c.occurrence_count, c.status,
-               c.first_seen_at, c.last_seen_at,
-               ARRAY_AGG(DISTINCT cs.channel_name)
-                 FILTER (WHERE cs.channel_name IS NOT NULL) AS channels
+        SELECT {_CLAIM_COLS}
         FROM claims c
         LEFT JOIN claim_sources cs ON cs.claim_id = c.id
         {where}
@@ -68,12 +80,8 @@ async def list_claims(
 async def get_claim(claim_id: int, _: str = Depends(require_auth)):
     async with AsyncSessionLocal() as session:
         row = await session.execute(
-            text("""
-                SELECT c.id, c.claim_text, c.category, c.temporal, c.checkworthy_score,
-                       c.source_attribution, c.urgency_signals, c.occurrence_count, c.status,
-                       c.first_seen_at, c.last_seen_at,
-                       ARRAY_AGG(DISTINCT cs.channel_name)
-                         FILTER (WHERE cs.channel_name IS NOT NULL) AS channels
+            text(f"""
+                SELECT {_CLAIM_COLS}
                 FROM claims c
                 LEFT JOIN claim_sources cs ON cs.claim_id = c.id
                 WHERE c.id = :id
@@ -108,12 +116,8 @@ async def patch_claim(claim_id: int, body: PatchStatusRequest, _: str = Depends(
         )
         await session.commit()
         row = await session.execute(
-            text("""
-                SELECT c.id, c.claim_text, c.category, c.temporal, c.checkworthy_score,
-                       c.source_attribution, c.urgency_signals, c.occurrence_count, c.status,
-                       c.first_seen_at, c.last_seen_at,
-                       ARRAY_AGG(DISTINCT cs.channel_name)
-                         FILTER (WHERE cs.channel_name IS NOT NULL) AS channels
+            text(f"""
+                SELECT {_CLAIM_COLS}
                 FROM claims c
                 LEFT JOIN claim_sources cs ON cs.claim_id = c.id
                 WHERE c.id = :id
