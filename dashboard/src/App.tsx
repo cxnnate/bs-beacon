@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { Credentials, Stats } from './types';
 import { getStats } from './api';
 import Login from './components/Login';
@@ -15,7 +15,7 @@ export default function App() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loginError, setLoginError] = useState(false);
 
-  async function handleLogin(c: Credentials) {
+  const handleLogin = useCallback(async (c: Credentials) => {
     try {
       const s = await getStats(c);
       setCreds(c);
@@ -24,7 +24,7 @@ export default function App() {
     } catch {
       setLoginError(true);
     }
-  }
+  }, []);
 
   useEffect(() => {
     if (!creds) return;

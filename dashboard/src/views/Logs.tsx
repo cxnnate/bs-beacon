@@ -21,9 +21,6 @@ export default function Logs({ service, creds }: Props) {
         if (active) {
           setText(logs);
           setHealthy(true);
-          if (containerRef.current) {
-            containerRef.current.scrollTop = containerRef.current.scrollHeight;
-          }
         }
       } catch {
         if (active) setHealthy(false);
@@ -37,6 +34,12 @@ export default function Logs({ service, creds }: Props) {
       clearInterval(id);
     };
   }, [service, creds]);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    }
+  }, [text]);
 
   return (
     <div>

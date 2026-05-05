@@ -39,8 +39,8 @@ export function getClaims(params: ClaimsParams, creds: Credentials): Promise<Cla
   if (params.category) qs.set('category', params.category);
   if (params.urgent !== undefined) qs.set('urgent', String(params.urgent));
   if (params.search) qs.set('search', params.search);
-  if (params.page) qs.set('page', String(params.page));
-  if (params.page_size) qs.set('page_size', String(params.page_size));
+  if (params.page !== undefined) qs.set('page', String(params.page));
+  if (params.page_size !== undefined) qs.set('page_size', String(params.page_size));
   return request<ClaimsResponse>(`/api/claims?${qs}`, creds);
 }
 
