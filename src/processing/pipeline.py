@@ -7,6 +7,7 @@ import yaml
 from dotenv import load_dotenv
 from sqlalchemy import text as sql_text
 
+from src.alerts.dispatcher import dispatch_alert
 from src.db.connection import AsyncSessionLocal
 from src.processing.claim_extractor import LLMClient, make_llm_client
 from src.processing.dedup import (
@@ -113,6 +114,10 @@ async def process_message(session, message: dict, llm_client: LLMClient, embedde
             await insert_claim(session, claim, embedding, source_language, urgency, extraction.meta, message)
             new_count += 1
             action = "new"
+            if urgency:
+                asyncio.create_task(
+                    dispatch_alert(claim.text, channel, claim.checkworthy_score)
+                )
         if len(claim.text.split()) <= 25:
             logger.info(f"  [{action}] \"{claim.text}\"")
 
