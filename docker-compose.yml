@@ -54,5 +54,16 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 
+  bsbeacon-dashboard:
+    container_name: bsbeacon-dashboard
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - bsbeacon-api
+    restart: unless-stopped
+
 volumes:
   postgres_data:
