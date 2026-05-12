@@ -4,6 +4,7 @@ import { useWebSocket } from '../ws';
 import { getClaims } from '../api';
 import ClaimCard from '../components/ClaimCard';
 import ChannelFilter from '../components/ChannelFilter';
+import CollapsibleSection from '../components/CollapsibleSection';
 
 interface Props {
   creds: Credentials;
@@ -14,6 +15,7 @@ export default function LiveFeed({ creds }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedChannels, setSelectedChannels] = useState<Set<string>>(new Set());
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     getClaims({ page_size: 50 }, creds)
@@ -43,11 +45,34 @@ export default function LiveFeed({ creds }: Props) {
     return Array.from(seen).sort();
   }, [claims]);
 
-  const visibleClaims = useMemo(() =>
-    selectedChannels.size === 0
-      ? claims
-      : claims.filter((c) => c.channels.some((ch) => selectedChannels.has(ch))),
-    [claims, selectedChannels],
+  const allCategories = useMemo(() => {
+    const seen = new Set<string>();
+    for (const c of claims) seen.add(c.category);
+    return Array.from(seen).sort();
+  }, [claims]);
+
+  const visibleClaims = useMemo(() => {
+    let filtered = claims;
+    if (selectedChannels.size > 0) {
+      filtered = filtered.filter((c) => c.channels.some((ch) => selectedChannels.has(ch)));
+    }
+    if (selectedCategories.size > 0) {
+      filtered = filtered.filter((c) => selectedCategories.has(c.category));
+    }
+    return filtered;
+  }, [claims, selectedChannels, selectedCategories]);
+
+  const verified = useMemo(
+    () => visibleClaims.filter((c) => c.status === 'reviewed'),
+    [visibleClaims],
+  );
+  const unverified = useMemo(
+    () => visibleClaims.filter((c) => c.status === 'unreviewed'),
+    [visibleClaims],
+  );
+  const dismissed = useMemo(
+    () => visibleClaims.filter((c) => c.status === 'dismissed'),
+    [visibleClaims],
   );
 
   if (loading) {
@@ -74,6 +99,8 @@ export default function LiveFeed({ creds }: Props) {
     );
   }
 
+  const noResults = verified.length === 0 && unverified.length === 0 && dismissed.length === 0;
+
   return (
     <div style={{ maxWidth: '800px' }}>
       <ChannelFilter
@@ -81,17 +108,47 @@ export default function LiveFeed({ creds }: Props) {
         selected={selectedChannels}
         onChange={setSelectedChannels}
       />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {visibleClaims.length === 0 ? (
-          <div style={{ color: 'var(--muted)', paddingTop: '24px', textAlign: 'center' }}>
-            No claims from selected channels
-          </div>
-        ) : (
-          visibleClaims.map((c) => (
-            <ClaimCard key={c.id} claim={c} creds={creds} onUpdate={updateClaim} />
-          ))
-        )}
-      </div>
+      <ChannelFilter
+        channels={allCategories}
+        selected={selectedCategories}
+        onChange={setSelectedCategories}
+        label="Category:"
+      />
+      {noResults ? (
+        <div style={{ color: 'var(--muted)', paddingTop: '24px', textAlign: 'center' }}>
+          No claims from selected filters
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {verified.length > 0 && (
+            <CollapsibleSection label="Verified" count={verified.length}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {verified.map((c) => (
+                  <ClaimCard key={c.id} claim={c} creds={creds} onUpdate={updateClaim} showActions={false} />
+                ))}
+              </div>
+            </CollapsibleSection>
+          )}
+          {unverified.length > 0 && (
+            <CollapsibleSection label="Unverified" count={unverified.length}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {unverified.map((c) => (
+                  <ClaimCard key={c.id} claim={c} creds={creds} onUpdate={updateClaim} showActions={false} />
+                ))}
+              </div>
+            </CollapsibleSection>
+          )}
+          {dismissed.length > 0 && (
+            <CollapsibleSection label="Dismissed" count={dismissed.length} defaultOpen={false}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {dismissed.map((c) => (
+                  <ClaimCard key={c.id} claim={c} creds={creds} onUpdate={updateClaim} showActions={false} />
+                ))}
+              </div>
+            </CollapsibleSection>
+          )}
+        </div>
+      )}
     </div>
   );
 }

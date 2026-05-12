@@ -3,33 +3,36 @@ import type { Claim, Credentials, Stats } from '../types';
 import { getClaims, getStats } from '../api';
 import ClaimCard from '../components/ClaimCard';
 import ChannelFilter from '../components/ChannelFilter';
+import CollapsibleSection from '../components/CollapsibleSection';
 
 interface Props {
   creds: Credentials;
   onStatsChange: (stats: Stats) => void;
 }
 
+const byScore = (a: Claim, b: Claim) =>
+  (b.urgency_signals ? 1 : 0) - (a.urgency_signals ? 1 : 0) ||
+  b.checkworthy_score - a.checkworthy_score;
+
 export default function Queue({ creds, onStatsChange }: Props) {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedChannels, setSelectedChannels] = useState<Set<string>>(new Set());
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    getClaims({ status: 'unreviewed', page_size: 100 }, creds)
+    getClaims({ page_size: 100 }, creds)
       .then((res) => {
-        const sorted = [...res.items].sort(
-          (a, b) =>
-            (b.urgency_signals ? 1 : 0) - (a.urgency_signals ? 1 : 0) ||
-            b.checkworthy_score - a.checkworthy_score,
-        );
-        setClaims(sorted);
+        setClaims(res.items.filter((c) => c.status !== 'reviewed'));
       })
       .finally(() => setLoading(false));
   }, [creds]);
 
   async function handleUpdate(updated: Claim) {
-    if (updated.status !== 'unreviewed') {
+    if (updated.status === 'reviewed') {
       setClaims((prev) => prev.filter((c) => c.id !== updated.id));
+    } else {
+      setClaims((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
     }
     try {
       onStatsChange(await getStats(creds));
@@ -44,11 +47,30 @@ export default function Queue({ creds, onStatsChange }: Props) {
     return Array.from(seen).sort();
   }, [claims]);
 
-  const visibleClaims = useMemo(() =>
-    selectedChannels.size === 0
-      ? claims
-      : claims.filter((c) => c.channels.some((ch) => selectedChannels.has(ch))),
-    [claims, selectedChannels],
+  const allCategories = useMemo(() => {
+    const seen = new Set<string>();
+    for (const c of claims) seen.add(c.category);
+    return Array.from(seen).sort();
+  }, [claims]);
+
+  const visibleClaims = useMemo(() => {
+    let filtered = claims;
+    if (selectedChannels.size > 0) {
+      filtered = filtered.filter((c) => c.channels.some((ch) => selectedChannels.has(ch)));
+    }
+    if (selectedCategories.size > 0) {
+      filtered = filtered.filter((c) => selectedCategories.has(c.category));
+    }
+    return filtered;
+  }, [claims, selectedChannels, selectedCategories]);
+
+  const unverified = useMemo(
+    () => [...visibleClaims.filter((c) => c.status === 'unreviewed')].sort(byScore),
+    [visibleClaims],
+  );
+  const dismissed = useMemo(
+    () => [...visibleClaims.filter((c) => c.status === 'dismissed')].sort(byScore),
+    [visibleClaims],
   );
 
   if (loading) {
@@ -67,6 +89,8 @@ export default function Queue({ creds, onStatsChange }: Props) {
     );
   }
 
+  const noResults = unverified.length === 0 && dismissed.length === 0;
+
   return (
     <div style={{ maxWidth: '800px' }}>
       <ChannelFilter
@@ -74,20 +98,41 @@ export default function Queue({ creds, onStatsChange }: Props) {
         selected={selectedChannels}
         onChange={setSelectedChannels}
       />
+      <ChannelFilter
+        channels={allCategories}
+        selected={selectedCategories}
+        onChange={setSelectedCategories}
+        label="Category:"
+      />
       <p style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '8px' }}>
         {visibleClaims.length === claims.length
-          ? `${claims.length} unreviewed claims`
-          : `${visibleClaims.length} of ${claims.length} unreviewed claims`}
+          ? `${claims.length} claims`
+          : `${visibleClaims.length} of ${claims.length} claims`}
       </p>
-      {visibleClaims.length === 0 ? (
+      {noResults ? (
         <div style={{ color: 'var(--muted)', paddingTop: '24px', textAlign: 'center' }}>
-          No unreviewed claims from selected channels
+          No claims from selected filters
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {visibleClaims.map((c) => (
-            <ClaimCard key={c.id} claim={c} creds={creds} onUpdate={handleUpdate} />
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {unverified.length > 0 && (
+            <CollapsibleSection label="Unverified" count={unverified.length}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {unverified.map((c) => (
+                  <ClaimCard key={c.id} claim={c} creds={creds} onUpdate={handleUpdate} />
+                ))}
+              </div>
+            </CollapsibleSection>
+          )}
+          {dismissed.length > 0 && (
+            <CollapsibleSection label="Dismissed" count={dismissed.length} defaultOpen={false}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {dismissed.map((c) => (
+                  <ClaimCard key={c.id} claim={c} creds={creds} onUpdate={handleUpdate} />
+                ))}
+              </div>
+            </CollapsibleSection>
+          )}
         </div>
       )}
     </div>

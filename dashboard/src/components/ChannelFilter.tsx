@@ -4,6 +4,7 @@ interface Props {
   channels: string[];
   selected: Set<string>;
   onChange: (next: Set<string>) => void;
+  label?: string;
 }
 
 function chipStyle(active: boolean): CSSProperties {
@@ -22,7 +23,7 @@ function chipStyle(active: boolean): CSSProperties {
   };
 }
 
-export default function ChannelFilter({ channels, selected, onChange }: Props) {
+export default function ChannelFilter({ channels, selected, onChange, label = 'Channel:' }: Props) {
   if (channels.length < 2) return null;
 
   function toggle(ch: string) {
@@ -43,7 +44,7 @@ export default function ChannelFilter({ channels, selected, onChange }: Props) {
       alignItems: 'center',
     }}>
       <span style={{ fontSize: '11px', color: 'var(--muted)', marginRight: '2px' }}>
-        Channel:
+        {label}
       </span>
       <button style={chipStyle(allActive)} onClick={() => onChange(new Set())}>
         All

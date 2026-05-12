@@ -128,7 +128,11 @@ async def run_scraper() -> None:
     channels = load_channels()
     api_id = int(os.environ["TELEGRAM_API_ID"])
     api_hash = os.environ["TELEGRAM_API_HASH"]
-    session_name = os.getenv("TELEGRAM_SESSION_NAME", "bsbeacon")
+    _in_docker = os.path.exists("/.dockerenv")
+    if _in_docker:
+        session_name = os.getenv("TELEGRAM_SESSION_NAME", "/app/.telegram_session/bsbeacon")
+    else:
+        session_name = os.getenv("TELEGRAM_SESSION_NAME_LOCAL", ".telegram_session/bsbeacon")
 
     async with AsyncSessionLocal() as session:
         await session.execute(text("SELECT 1"))

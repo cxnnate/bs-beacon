@@ -5,6 +5,32 @@ interface Props {
   claim: Claim;
   creds: Credentials;
   onUpdate: (updated: Claim) => void;
+  showActions?: boolean;
+}
+
+function StatusBadge({ status }: { status: Claim['status'] }) {
+  if (status === 'reviewed') {
+    return (
+      <span style={{
+        fontSize: '10px', color: '#22c55e', border: '1px solid #22c55e',
+        padding: '1px 6px', borderRadius: '3px', fontWeight: 600,
+      }}>✓ Verified</span>
+    );
+  }
+  if (status === 'dismissed') {
+    return (
+      <span style={{
+        fontSize: '10px', color: 'var(--muted)', border: '1px solid var(--border)',
+        padding: '1px 6px', borderRadius: '3px',
+      }}>Dismissed</span>
+    );
+  }
+  return (
+    <span style={{
+      fontSize: '10px', color: 'var(--muted)', border: '1px solid var(--border)',
+      padding: '1px 6px', borderRadius: '3px',
+    }}>Unverified</span>
+  );
 }
 
 function relativeTime(dateStr: string): string {
@@ -15,7 +41,7 @@ function relativeTime(dateStr: string): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-export default function ClaimCard({ claim, creds, onUpdate }: Props) {
+export default function ClaimCard({ claim, creds, onUpdate, showActions = true }: Props) {
   const channel = claim.channels[0] ?? 'Unknown';
 
   async function handleAction(status: 'reviewed' | 'dismissed') {
@@ -50,6 +76,7 @@ export default function ClaimCard({ claim, creds, onUpdate }: Props) {
           }}>{claim.category}</span>
         )}
         <span style={{ fontSize: '11px', color: 'var(--muted)' }}>{claim.temporal}</span>
+        <StatusBadge status={claim.status} />
         <span style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--muted)' }}>
           📡 {channel} · {relativeTime(claim.last_seen_at)}
         </span>
@@ -60,8 +87,12 @@ export default function ClaimCard({ claim, creds, onUpdate }: Props) {
       </p>
 
       <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-        <button onClick={() => void handleAction('reviewed')}>✓ Reviewed</button>
-        <button onClick={() => void handleAction('dismissed')}>✕ Dismiss</button>
+        {showActions && (
+          <>
+            <button onClick={() => void handleAction('reviewed')}>✓ Reviewed</button>
+            <button onClick={() => void handleAction('dismissed')}>✕ Dismiss</button>
+          </>
+        )}
         <span style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--muted)' }}>
           score: {claim.checkworthy_score.toFixed(2)} · ×{claim.occurrence_count}
         </span>

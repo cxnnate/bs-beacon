@@ -12,9 +12,12 @@ channels:
   health:
     - username: "RealHealthRanger"
       display_name: "Health Ranger"
-  tech:
-    - username: "tech"
-      display_name: "Startups & Ventures"
-  stock_market:
-    - username: "trading"
-      display_name: "Trade Watcher"
+  trump:
+    - username: "real_DonaldJTrump"
+      display_name: "Donald J. Trump"
+  # tech:
+  #   - username: "tech"
+  #     display_name: "Startups & Ventures"
+  # stock_market:
+  #   - username: "trading"
+  #     display_name: "Trade Watcher"
