@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
-  forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide,
+  forceSimulation, forceLink, forceManyBody, forceX, forceY, forceCollide,
   type SimulationNodeDatum,
 } from 'd3-force';
 import type { Credentials, NetworkData, NetworkNode } from '../types';
@@ -43,21 +43,44 @@ function radius(occurrenceCount: number): number {
 }
 
 function runLayout(data: NetworkData): { nodes: LayoutNode[]; edges: LayoutEdge[] } {
-  const nodes: LayoutNode[] = data.nodes.map((n) => ({
-    id: n.id, node: n, x: WIDTH / 2, y: HEIGHT / 2,
+  // Phyllotaxis initial spread — coincident starting positions make the
+  // charge force explode disconnected components apart.
+  const nodes: LayoutNode[] = data.nodes.map((n, i) => ({
+    id: n.id,
+    node: n,
+    x: WIDTH / 2 + 14 * Math.sqrt(i) * Math.cos(i * 2.4),
+    y: HEIGHT / 2 + 14 * Math.sqrt(i) * Math.sin(i * 2.4),
   }));
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const links = data.edges
     .filter((e) => byId.has(e.source) && byId.has(e.target))
     .map((e) => ({ source: e.source, target: e.target, relation: e.relation }));
 
+  // forceX/forceY (not forceCenter): the graph is mostly small disconnected
+  // components, and forceCenter only pins the centroid while components
+  // repel each other unboundedly.
   const sim = forceSimulation(nodes)
     .force('link', forceLink(links.map((l) => ({ ...l }))).id((d) => (d as LayoutNode).id).distance(90))
     .force('charge', forceManyBody().strength(-220))
-    .force('center', forceCenter(WIDTH / 2, HEIGHT / 2))
+    .force('x', forceX(WIDTH / 2).strength(0.07))
+    .force('y', forceY(HEIGHT / 2).strength(0.07))
     .force('collide', forceCollide().radius((d) => radius((d as LayoutNode).node.occurrence_count) + 14))
     .stop();
   for (let i = 0; i < 300; i++) sim.tick();
+
+  // Normalize into the viewBox with padding so the graph is always visible.
+  const PAD = 50;
+  const xs = nodes.map((n) => n.x);
+  const ys = nodes.map((n) => n.y);
+  const minX = Math.min(...xs); const maxX = Math.max(...xs);
+  const minY = Math.min(...ys); const maxY = Math.max(...ys);
+  const spanX = Math.max(maxX - minX, 1);
+  const spanY = Math.max(maxY - minY, 1);
+  const scale = Math.min((WIDTH - 2 * PAD) / spanX, (HEIGHT - 2 * PAD) / spanY, 1);
+  for (const n of nodes) {
+    n.x = PAD + (n.x - minX) * scale + (WIDTH - 2 * PAD - spanX * scale) / 2;
+    n.y = PAD + (n.y - minY) * scale + (HEIGHT - 2 * PAD - spanY * scale) / 2;
+  }
 
   const edges: LayoutEdge[] = links.map((l) => ({
     source: byId.get(l.source)!,
