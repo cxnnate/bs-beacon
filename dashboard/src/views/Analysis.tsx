@@ -18,7 +18,6 @@ const COLORS: Record<string, string> = {
   environment: '#10b981',
   science: '#8b5cf6',
   crime: '#ec4899',
-  conspiracy: '#f43f5e',
   other: '#6b7280',
 };
 
@@ -40,12 +39,12 @@ export default function Analysis({ creds }: Props) {
     );
   }
 
-  const categories = [...new Set(claims.map((c) => c.category))];
-  const byCategory = categories.map((cat) => ({
-    name: cat,
-    fill: COLORS[cat] ?? '#6b7280',
+  const topics = [...new Set(claims.map((c) => c.topic))];
+  const byCategory = topics.map((topic) => ({
+    name: topic,
+    fill: COLORS[topic] ?? '#6b7280',
     data: claims
-      .filter((c) => c.category === cat)
+      .filter((c) => c.topic === topic)
       .map((c) => ({ x: c.checkworthy_score, y: c.occurrence_count, text: c.claim_text })),
   }));
 

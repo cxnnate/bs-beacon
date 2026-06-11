@@ -45,9 +45,9 @@ export default function LiveFeed({ creds }: Props) {
     return Array.from(seen).sort();
   }, [claims]);
 
-  const allCategories = useMemo(() => {
+  const allTopics = useMemo(() => {
     const seen = new Set<string>();
-    for (const c of claims) seen.add(c.category);
+    for (const c of claims) seen.add(c.topic);
     return Array.from(seen).sort();
   }, [claims]);
 
@@ -57,21 +57,21 @@ export default function LiveFeed({ creds }: Props) {
       filtered = filtered.filter((c) => c.channels.some((ch) => selectedChannels.has(ch)));
     }
     if (selectedCategories.size > 0) {
-      filtered = filtered.filter((c) => selectedCategories.has(c.category));
+      filtered = filtered.filter((c) => selectedCategories.has(c.topic));
     }
     return filtered;
   }, [claims, selectedChannels, selectedCategories]);
 
   const verified = useMemo(
-    () => visibleClaims.filter((c) => c.status === 'reviewed'),
+    () => visibleClaims.filter((c) => c.status === 'verified'),
     [visibleClaims],
   );
   const unverified = useMemo(
-    () => visibleClaims.filter((c) => c.status === 'unreviewed'),
+    () => visibleClaims.filter((c) => c.status === 'unreviewed' || c.status === 'needs_info'),
     [visibleClaims],
   );
-  const dismissed = useMemo(
-    () => visibleClaims.filter((c) => c.status === 'dismissed'),
+  const debunked = useMemo(
+    () => visibleClaims.filter((c) => c.status === 'debunked'),
     [visibleClaims],
   );
 
@@ -99,7 +99,7 @@ export default function LiveFeed({ creds }: Props) {
     );
   }
 
-  const noResults = verified.length === 0 && unverified.length === 0 && dismissed.length === 0;
+  const noResults = verified.length === 0 && unverified.length === 0 && debunked.length === 0;
 
   return (
     <div style={{ maxWidth: '800px' }}>
@@ -109,10 +109,10 @@ export default function LiveFeed({ creds }: Props) {
         onChange={setSelectedChannels}
       />
       <ChannelFilter
-        channels={allCategories}
+        channels={allTopics}
         selected={selectedCategories}
         onChange={setSelectedCategories}
-        label="Category:"
+        label="Topic:"
       />
       {noResults ? (
         <div style={{ color: 'var(--muted)', paddingTop: '24px', textAlign: 'center' }}>
@@ -130,7 +130,7 @@ export default function LiveFeed({ creds }: Props) {
             </CollapsibleSection>
           )}
           {unverified.length > 0 && (
-            <CollapsibleSection label="Unverified" count={unverified.length}>
+            <CollapsibleSection label="Unreviewed" count={unverified.length}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {unverified.map((c) => (
                   <ClaimCard key={c.id} claim={c} creds={creds} onUpdate={updateClaim} showActions={false} />
@@ -138,10 +138,10 @@ export default function LiveFeed({ creds }: Props) {
               </div>
             </CollapsibleSection>
           )}
-          {dismissed.length > 0 && (
-            <CollapsibleSection label="Dismissed" count={dismissed.length} defaultOpen={false}>
+          {debunked.length > 0 && (
+            <CollapsibleSection label="Debunked" count={debunked.length} defaultOpen={false}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {dismissed.map((c) => (
+                {debunked.map((c) => (
                   <ClaimCard key={c.id} claim={c} creds={creds} onUpdate={updateClaim} showActions={false} />
                 ))}
               </div>

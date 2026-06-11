@@ -7,6 +7,7 @@ import LiveFeed from './views/LiveFeed';
 import Trending from './views/Trending';
 import Analysis from './views/Analysis';
 import Queue from './views/Queue';
+import Network from './views/Network';
 import Logs from './views/Logs';
 
 function BeaconIcon() {
@@ -73,6 +74,7 @@ export default function App() {
           {view === 'trending' && <Trending creds={creds} />}
           {view === 'analysis' && <Analysis creds={creds} />}
           {view === 'queue' && <Queue creds={creds} onStatsChange={setStats} />}
+          {view === 'network' && <Network creds={creds} />}
           {view === 'scraper' && <Logs service="scraper" creds={creds} />}
           {view === 'processor' && <Logs service="processor" creds={creds} />}
         </main>

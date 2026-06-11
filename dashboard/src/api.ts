@@ -1,4 +1,4 @@
-import type { Claim, Stats, Credentials } from './types';
+import type { Claim, Stats, Credentials, NetworkData } from './types';
 
 function authHeader(creds: Credentials): string {
   return 'Basic ' + btoa(`${creds.username}:${creds.password}`);
@@ -6,7 +6,7 @@ function authHeader(creds: Credentials): string {
 
 export interface ClaimsParams {
   status?: string;
-  category?: string;
+  topic?: string;
   urgent?: boolean;
   search?: string;
   page?: number;
@@ -36,7 +36,7 @@ async function request<T>(url: string, creds: Credentials, init?: RequestInit): 
 export function getClaims(params: ClaimsParams, creds: Credentials): Promise<ClaimsResponse> {
   const qs = new URLSearchParams();
   if (params.status) qs.set('status', params.status);
-  if (params.category) qs.set('category', params.category);
+  if (params.topic) qs.set('topic', params.topic);
   if (params.urgent !== undefined) qs.set('urgent', String(params.urgent));
   if (params.search) qs.set('search', params.search);
   if (params.page !== undefined) qs.set('page', String(params.page));
@@ -46,13 +46,18 @@ export function getClaims(params: ClaimsParams, creds: Credentials): Promise<Cla
 
 export function patchClaim(
   id: number,
-  status: 'reviewed' | 'dismissed',
+  status: 'verified' | 'debunked' | 'needs_info',
   creds: Credentials,
 ): Promise<Claim> {
   return request<Claim>(`/api/claims/${id}`, creds, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
   });
+}
+
+export function getNetwork(days: number | null, creds: Credentials): Promise<NetworkData> {
+  const qs = days ? `?days=${days}` : '';
+  return request<NetworkData>(`/api/claims/network${qs}`, creds);
 }
 
 export function getStats(creds: Credentials): Promise<Stats> {

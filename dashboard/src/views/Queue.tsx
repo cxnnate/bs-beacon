@@ -23,13 +23,13 @@ export default function Queue({ creds, onStatsChange }: Props) {
   useEffect(() => {
     getClaims({ page_size: 100 }, creds)
       .then((res) => {
-        setClaims(res.items.filter((c) => c.status !== 'reviewed'));
+        setClaims(res.items.filter((c) => c.status === 'unreviewed' || c.status === 'needs_info'));
       })
       .finally(() => setLoading(false));
   }, [creds]);
 
   async function handleUpdate(updated: Claim) {
-    if (updated.status === 'reviewed') {
+    if (updated.status === 'verified' || updated.status === 'debunked') {
       setClaims((prev) => prev.filter((c) => c.id !== updated.id));
     } else {
       setClaims((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
@@ -47,9 +47,9 @@ export default function Queue({ creds, onStatsChange }: Props) {
     return Array.from(seen).sort();
   }, [claims]);
 
-  const allCategories = useMemo(() => {
+  const allTopics = useMemo(() => {
     const seen = new Set<string>();
-    for (const c of claims) seen.add(c.category);
+    for (const c of claims) seen.add(c.topic);
     return Array.from(seen).sort();
   }, [claims]);
 
@@ -59,17 +59,17 @@ export default function Queue({ creds, onStatsChange }: Props) {
       filtered = filtered.filter((c) => c.channels.some((ch) => selectedChannels.has(ch)));
     }
     if (selectedCategories.size > 0) {
-      filtered = filtered.filter((c) => selectedCategories.has(c.category));
+      filtered = filtered.filter((c) => selectedCategories.has(c.topic));
     }
     return filtered;
   }, [claims, selectedChannels, selectedCategories]);
 
-  const unverified = useMemo(
+  const unreviewed = useMemo(
     () => [...visibleClaims.filter((c) => c.status === 'unreviewed')].sort(byScore),
     [visibleClaims],
   );
-  const dismissed = useMemo(
-    () => [...visibleClaims.filter((c) => c.status === 'dismissed')].sort(byScore),
+  const needsInfo = useMemo(
+    () => [...visibleClaims.filter((c) => c.status === 'needs_info')].sort(byScore),
     [visibleClaims],
   );
 
@@ -89,7 +89,7 @@ export default function Queue({ creds, onStatsChange }: Props) {
     );
   }
 
-  const noResults = unverified.length === 0 && dismissed.length === 0;
+  const noResults = unreviewed.length === 0 && needsInfo.length === 0;
 
   return (
     <div style={{ maxWidth: '800px' }}>
@@ -99,10 +99,10 @@ export default function Queue({ creds, onStatsChange }: Props) {
         onChange={setSelectedChannels}
       />
       <ChannelFilter
-        channels={allCategories}
+        channels={allTopics}
         selected={selectedCategories}
         onChange={setSelectedCategories}
-        label="Category:"
+        label="Topic:"
       />
       <p style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '8px' }}>
         {visibleClaims.length === claims.length
@@ -115,19 +115,19 @@ export default function Queue({ creds, onStatsChange }: Props) {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {unverified.length > 0 && (
-            <CollapsibleSection label="Unverified" count={unverified.length}>
+          {unreviewed.length > 0 && (
+            <CollapsibleSection label="Unreviewed" count={unreviewed.length}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {unverified.map((c) => (
+                {unreviewed.map((c) => (
                   <ClaimCard key={c.id} claim={c} creds={creds} onUpdate={handleUpdate} />
                 ))}
               </div>
             </CollapsibleSection>
           )}
-          {dismissed.length > 0 && (
-            <CollapsibleSection label="Dismissed" count={dismissed.length} defaultOpen={false}>
+          {needsInfo.length > 0 && (
+            <CollapsibleSection label="Needs info" count={needsInfo.length} defaultOpen={false}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {dismissed.map((c) => (
+                {needsInfo.map((c) => (
                   <ClaimCard key={c.id} claim={c} creds={creds} onUpdate={handleUpdate} />
                 ))}
               </div>

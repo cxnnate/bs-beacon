@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 import type { Stats } from '../types';
 
-export type View = 'live' | 'trending' | 'analysis' | 'queue' | 'scraper' | 'processor';
+export type View = 'live' | 'trending' | 'analysis' | 'queue' | 'network' | 'scraper' | 'processor';
 
 interface Props {
   view: View;
@@ -14,6 +14,7 @@ const NAV: { id: View; label: string }[] = [
   { id: 'trending', label: '📈 Trending' },
   { id: 'analysis', label: '🔬 Analysis' },
   { id: 'queue', label: '✅ Queue' },
+  { id: 'network', label: '🕸 Network' },
 ];
 
 function navStyle(active: boolean): CSSProperties {
