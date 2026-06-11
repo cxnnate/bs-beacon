@@ -8,7 +8,9 @@ processor:
   max_failed_attempts: 3
 
 dedup:
-  similarity_threshold: 0.92
+  # Candidate-retrieval cutoff for the NLI guard, not a merge threshold.
+  # multilingual-e5 cosine runs high (~0.77 floor for unrelated texts).
+  similarity_threshold: 0.88
 
 urgency:
   caps_ratio_threshold: 0.4

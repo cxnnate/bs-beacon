@@ -11,11 +11,14 @@ from src.alerts.dispatcher import dispatch_alert
 from src.db.connection import AsyncSessionLocal
 from src.processing.claim_extractor import LLMClient, make_llm_client
 from src.processing.dedup import (
-    compute_text_hash, find_by_text_hash, find_similar_claim,
+    CrossEncoderNLIChecker, NLIChecker,
+    compute_text_hash, find_by_text_hash, find_candidate_claims,
+    resolve_dedup, insert_claim_relation,
     merge_claim, insert_claim, copy_claims_from_message,
 )
 from src.processing.embeddings import Embedder
 from src.processing.language import detect_language
+from src.processing.schemas import ClaimRelation
 from src.processing.urgency import check_urgency, combine_urgency
 
 logger = logging.getLogger(__name__)
@@ -62,7 +65,10 @@ async def should_abandon(session, msg_id: int, max_attempts: int = 3) -> bool:
     return bool(row and row[0] >= max_attempts)
 
 
-async def process_message(session, message: dict, llm_client: LLMClient, embedder: Embedder) -> None:
+async def process_message(
+    session, message: dict, llm_client: LLMClient, embedder: Embedder, nli_checker: NLIChecker,
+    dedup_threshold: float = 0.88,
+) -> None:
     msg_id = message["id"]
     msg_text = message["message_text"]
     channel = message["channel_name"]
@@ -81,6 +87,7 @@ async def process_message(session, message: dict, llm_client: LLMClient, embedde
         await copy_claims_from_message(
             session, existing_msg_id, msg_id,
             message["channel_name"], message["message_date"],
+            channel_id=message.get("channel_id"),
         )
         await mark_processed(session, msg_id)
         return
@@ -105,13 +112,23 @@ async def process_message(session, message: dict, llm_client: LLMClient, embedde
     new_count = merged_count = 0
     for claim in extraction.claims:
         embedding = embedder.embed(claim.text)
-        similar_id = await find_similar_claim(session, embedding)
-        if similar_id:
-            await merge_claim(session, similar_id, msg_id, message["channel_name"], message["message_date"])
+        candidates = await find_candidate_claims(session, embedding, threshold=dedup_threshold)
+        merge_id, contradiction_ids = await resolve_dedup(
+            session, nli_checker, claim.text, candidates
+        )
+        if merge_id:
+            await merge_claim(
+                session, merge_id, msg_id,
+                message["channel_name"], message["message_date"],
+                channel_id=message.get("channel_id"),
+            )
             merged_count += 1
             action = "merged"
         else:
-            await insert_claim(session, claim, embedding, source_language, urgency, extraction.meta, message)
+            claim_id = await insert_claim(session, claim, embedding, source_language, urgency, extraction.meta, message)
+            for contra_id in contradiction_ids:
+                await insert_claim_relation(session, claim_id, contra_id, ClaimRelation.contradicts)
+                logger.info(f"  [contradicts] claim {claim_id} ↔ claim {contra_id}")
             new_count += 1
             action = "new"
             if urgency:
@@ -138,9 +155,11 @@ async def run_pipeline() -> None:
     batch_size = settings["processor"]["batch_size"]
     poll_interval = settings["processor"]["poll_interval_seconds"]
     max_attempts = settings["processor"]["max_failed_attempts"]
+    dedup_threshold = settings["dedup"]["similarity_threshold"]
 
     llm_client = make_llm_client()
     embedder = Embedder()
+    nli_checker = CrossEncoderNLIChecker()
 
     async with AsyncSessionLocal() as session:
         await session.execute(sql_text("SELECT 1"))
@@ -164,7 +183,10 @@ async def run_pipeline() -> None:
                     await session.commit()
                     continue
                 try:
-                    await process_message(session, message, llm_client, embedder)
+                    await process_message(
+                        session, message, llm_client, embedder, nli_checker,
+                        dedup_threshold=dedup_threshold,
+                    )
                     await session.commit()
                 except Exception:
                     await session.rollback()

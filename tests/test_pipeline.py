@@ -47,29 +47,60 @@ async def test_process_message_calls_llm_and_stores_claim(
     mock_llm = MagicMock()
     mock_llm.extract.return_value = sample_extraction_result
     mock_embedder = MagicMock()
-    mock_embedder.embed.return_value = [0.1] * 384
+    mock_embedder.embed.return_value = [0.1] * 768
+    mock_nli = MagicMock()
 
-    # 6 execute calls:
+    # 7 execute calls:
     # 1. UPDATE text_hash on raw_messages
     # 2. find_by_text_hash → no hit
-    # 3. find_similar_claim → no hit
+    # 3. find_candidate_claims → no candidates
     # 4. INSERT claims RETURNING id
-    # 5. INSERT claim_sources
-    # 6. mark_processed UPDATE
+    # 5. UPDATE cluster_id self-assign
+    # 6. INSERT claim_sources
+    # 7. mark_processed UPDATE
     responses = [
-        MagicMock(fetchone=MagicMock(return_value=None)),   # UPDATE text_hash
-        MagicMock(fetchone=MagicMock(return_value=None)),   # find_by_text_hash → no hit
-        MagicMock(fetchone=MagicMock(return_value=None)),   # find_similar_claim → no hit
-        MagicMock(fetchone=MagicMock(return_value=(1,))),   # INSERT claims RETURNING id
-        MagicMock(fetchone=MagicMock(return_value=None)),   # INSERT claim_sources
-        MagicMock(fetchone=MagicMock(return_value=None)),   # mark_processed UPDATE
+        MagicMock(fetchone=MagicMock(return_value=None)),    # UPDATE text_hash
+        MagicMock(fetchone=MagicMock(return_value=None)),    # find_by_text_hash → no hit
+        MagicMock(fetchall=MagicMock(return_value=[])),      # find_candidate_claims → none
+        MagicMock(fetchone=MagicMock(return_value=(1,))),    # INSERT claims RETURNING id
+        MagicMock(fetchone=MagicMock(return_value=None)),    # UPDATE cluster_id
+        MagicMock(fetchone=MagicMock(return_value=None)),    # INSERT claim_sources
+        MagicMock(fetchone=MagicMock(return_value=None)),    # mark_processed UPDATE
     ]
     mock_session.execute.side_effect = responses
 
-    await process_message(mock_session, sample_raw_message, mock_llm, mock_embedder)
+    await process_message(mock_session, sample_raw_message, mock_llm, mock_embedder, mock_nli)
 
     mock_llm.extract.assert_called_once()
     mock_embedder.embed.assert_called_once_with("The FDA approved a new COVID-19 vaccine")
+    mock_nli.check_relation.assert_not_called()  # no candidates → no NLI calls
+
+
+async def test_process_message_merges_on_entailment(
+    mock_session, sample_extraction_result, sample_raw_message
+):
+    from src.processing.schemas import NLILabel
+
+    mock_llm = MagicMock()
+    mock_llm.extract.return_value = sample_extraction_result
+    mock_embedder = MagicMock()
+    mock_embedder.embed.return_value = [0.1] * 768
+    mock_nli = MagicMock()
+    mock_nli.check_relation.return_value = NLILabel.entailment
+
+    responses = [
+        MagicMock(fetchone=MagicMock(return_value=None)),    # UPDATE text_hash
+        MagicMock(fetchone=MagicMock(return_value=None)),    # find_by_text_hash → no hit
+        MagicMock(fetchall=MagicMock(return_value=[(7, "FDA approved a COVID-19 vaccine")])),
+        MagicMock(fetchone=MagicMock(return_value=None)),    # merge_claim UPDATE
+        MagicMock(fetchone=MagicMock(return_value=None)),    # merge_claim INSERT claim_sources
+        MagicMock(fetchone=MagicMock(return_value=None)),    # mark_processed UPDATE
+    ]
+    mock_session.execute.side_effect = responses
+
+    await process_message(mock_session, sample_raw_message, mock_llm, mock_embedder, mock_nli)
+
+    mock_nli.check_relation.assert_called_once()
 
 
 async def test_process_message_skips_llm_on_text_hash_hit(
@@ -77,6 +108,7 @@ async def test_process_message_skips_llm_on_text_hash_hit(
 ):
     mock_llm = MagicMock()
     mock_embedder = MagicMock()
+    mock_nli = MagicMock()
 
     # 5 execute calls:
     # 1. UPDATE text_hash
@@ -93,6 +125,6 @@ async def test_process_message_skips_llm_on_text_hash_hit(
     ]
     mock_session.execute.side_effect = responses
 
-    await process_message(mock_session, sample_raw_message, mock_llm, mock_embedder)
+    await process_message(mock_session, sample_raw_message, mock_llm, mock_embedder, mock_nli)
 
     mock_llm.extract.assert_not_called()
