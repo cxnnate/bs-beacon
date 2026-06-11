@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 from src.processing.schemas import (
     ExtractionResult, ExtractedClaim, ExtractionMeta,
-    ClaimEntities, ClaimCategory, Temporality, MessageType,
+    ClaimEntities, ClaimTopic, Temporality, MessageType,
 )
 
 
@@ -24,7 +24,7 @@ def sample_extraction_result():
             ExtractedClaim(
                 text="The FDA approved a new COVID-19 vaccine",
                 entities=ClaimEntities(organizations=["FDA"]),
-                category=ClaimCategory.health,
+                topic=ClaimTopic.health,
                 temporal=Temporality.past,
                 checkworthy_score=0.9,
                 source_attribution=None,
@@ -32,10 +32,9 @@ def sample_extraction_result():
         ],
         meta=ExtractionMeta(
             message_type=MessageType.news_share,
-            claim_count=1,
             language_detected="en",
-            contains_media_reference=False,
             urgency_signals=False,
+            conspiratorial_framing=False,
         ),
     )
 
