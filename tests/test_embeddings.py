@@ -4,7 +4,7 @@ from src.processing.embeddings import Embedder
 def test_embedding_has_correct_dimensions():
     embedder = Embedder()
     vec = embedder.embed("The FDA approved a new vaccine for COVID-19.")
-    assert len(vec) == 384
+    assert len(vec) == 768
 
 
 def test_embedding_is_list_of_floats():
@@ -21,11 +21,20 @@ def test_similar_texts_high_cosine_similarity():
     assert embedder.cosine_similarity(v1, v2) > 0.85
 
 
-def test_different_texts_low_cosine_similarity():
+def test_different_texts_below_dedup_threshold():
+    # e5 models compress cosine into a high range (~0.7 floor for unrelated
+    # texts), so "low" similarity means below the 0.88 candidate threshold.
     embedder = Embedder()
     v1 = embedder.embed("The FDA approved a new COVID-19 vaccine.")
     v2 = embedder.embed("Stock markets fell sharply on Friday amid recession fears.")
-    assert embedder.cosine_similarity(v1, v2) < 0.5
+    assert embedder.cosine_similarity(v1, v2) < 0.85
+
+
+def test_crosslingual_same_claim_above_dedup_threshold():
+    embedder = Embedder()
+    v1 = embedder.embed("The FDA approved a new COVID-19 vaccine.")
+    v2 = embedder.embed("La FDA aprobó una nueva vacuna contra el COVID-19.")
+    assert embedder.cosine_similarity(v1, v2) > 0.88
 
 
 def test_same_text_similarity_is_one():

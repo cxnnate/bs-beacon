@@ -2,7 +2,9 @@ import numpy as np
 from functools import lru_cache
 from sentence_transformers import SentenceTransformer
 
-_MODEL_NAME = "all-MiniLM-L6-v2"
+_MODEL_NAME = "intfloat/multilingual-e5-base"
+# e5 models require a task prefix; "query: " on both sides for symmetric similarity
+_E5_PREFIX = "query: "
 
 
 @lru_cache(maxsize=1)
@@ -17,7 +19,7 @@ class Embedder:
     def embed(self, text: str) -> list[float]:
         if not text or not text.strip():
             raise ValueError("embed() requires non-empty text")
-        vec = self._model.encode(text, normalize_embeddings=True, show_progress_bar=False)
+        vec = self._model.encode(_E5_PREFIX + text, normalize_embeddings=True, show_progress_bar=False)
         return vec.tolist()
 
     @staticmethod
