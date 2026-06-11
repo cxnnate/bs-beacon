@@ -1,7 +1,5 @@
-import json
 import logging
 import os
-import re
 from pathlib import Path
 from typing import Protocol
 from anthropic import Anthropic
@@ -20,13 +18,73 @@ def _load_system_prompt() -> str:
         raise FileNotFoundError(f"System prompt not found at {_SYSTEM_PROMPT_PATH}")
 
 
-_FALLBACK_META = {
-    "message_type": "unclear",
-    "claim_count": 0,
-    "language_detected": "unknown",
-    "contains_media_reference": False,
-    "urgency_signals": False,
+EXTRACTION_TOOL = {
+    "name": "record_extracted_claims",
+    "description": "Record all discrete verifiable claims found in a Telegram message.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "claims": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "text": {"type": "string"},
+                        "entities": {
+                            "type": "object",
+                            "properties": {
+                                "people": {"type": "array", "items": {"type": "string"}},
+                                "organizations": {"type": "array", "items": {"type": "string"}},
+                                "locations": {"type": "array", "items": {"type": "string"}},
+                                "quantities": {"type": "array", "items": {"type": "string"}},
+                            },
+                        },
+                        "topic": {
+                            "type": "string",
+                            "enum": ["health", "politics", "finance", "technology",
+                                     "military", "environment", "science", "crime", "other"],
+                        },
+                        "temporal": {
+                            "type": "string",
+                            "enum": ["past", "present", "future", "unspecified"],
+                        },
+                        "checkworthy_score": {"type": "number", "minimum": 0, "maximum": 1},
+                        "source_attribution": {"type": ["string", "null"]},
+                    },
+                    "required": ["text", "entities", "topic", "checkworthy_score"],
+                },
+            },
+            "meta": {
+                "type": "object",
+                "properties": {
+                    "message_type": {
+                        "type": "string",
+                        "enum": ["news_share", "opinion_rant", "forwarded_alert",
+                                 "question", "conversation", "propaganda", "satire", "unclear"],
+                    },
+                    "language_detected": {"type": "string"},
+                    "urgency_signals": {"type": "boolean"},
+                    "conspiratorial_framing": {"type": "boolean"},
+                },
+                "required": ["message_type", "language_detected",
+                             "urgency_signals", "conspiratorial_framing"],
+            },
+        },
+        "required": ["claims", "meta"],
+    },
 }
+
+
+def _fallback_result() -> ExtractionResult:
+    return ExtractionResult(
+        claims=[],
+        meta=ExtractionMeta(
+            message_type=MessageType.unclear,
+            language_detected="unknown",
+            urgency_signals=False,
+            conspiratorial_framing=False,
+        ),
+    )
 
 
 class LLMClient(Protocol):
@@ -63,29 +121,19 @@ class ClaudeClient:
             f"Message:\n---\n{text}\n---"
         )
 
-        response = self._client.messages.create(
-            model=self._model,
-            max_tokens=4096,
-            system=self._system_prompt,
-            messages=[{"role": "user", "content": user_prompt}],
-        )
-
-        if not response.content:
-            logger.warning("LLM returned empty content (stop_reason=%s)", response.stop_reason)
-            return ExtractionResult(claims=[], meta=ExtractionMeta(**_FALLBACK_META))
-
-        raw = response.content[0].text.strip()
-        raw = re.sub(r"^```[a-z]*\n?", "", raw)
-        raw = re.sub(r"\n?```$", "", raw).strip()
-
         try:
-            return ExtractionResult.model_validate(json.loads(raw))
-        except Exception as e:
-            logger.warning("Failed to parse LLM response: %s", e, exc_info=True)
-            return ExtractionResult(
-                claims=[],
-                meta=ExtractionMeta(**_FALLBACK_META),
+            response = self._client.messages.create(
+                model=self._model,
+                max_tokens=2000,
+                system=self._system_prompt,
+                tools=[EXTRACTION_TOOL],
+                tool_choice={"type": "tool", "name": "record_extracted_claims"},
+                messages=[{"role": "user", "content": user_prompt}],
             )
+            return ExtractionResult.model_validate(response.content[0].input)
+        except Exception:
+            logger.exception("Claim extraction failed")
+            return _fallback_result()
 
 
 def make_llm_client() -> LLMClient:
