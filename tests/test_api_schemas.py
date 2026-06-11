@@ -8,7 +8,7 @@ def test_claim_response_serializes():
     c = ClaimResponse(
         id=1,
         claim_text="Test claim",
-        category="military",
+        topic="military",
         temporal="past",
         checkworthy_score=0.91,
         source_attribution=None,
@@ -28,9 +28,15 @@ def test_patch_status_rejects_invalid():
         PatchStatusRequest(status="bogus")
 
 
-def test_patch_status_accepts_reviewed():
-    req = PatchStatusRequest(status="reviewed")
-    assert req.status == "reviewed"
+def test_patch_status_accepts_verdicts():
+    for verdict in ("verified", "debunked", "needs_info"):
+        req = PatchStatusRequest(status=verdict)
+        assert req.status == verdict
+
+
+def test_patch_status_rejects_unreviewed():
+    with pytest.raises(ValidationError):
+        PatchStatusRequest(status="unreviewed")
 
 
 def test_stats_response_shape():

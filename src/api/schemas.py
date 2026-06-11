@@ -6,7 +6,7 @@ from pydantic import BaseModel
 class ClaimResponse(BaseModel):
     id: int
     claim_text: str
-    category: str
+    topic: str
     temporal: str
     checkworthy_score: float
     source_attribution: Optional[str]
@@ -29,7 +29,7 @@ class ClaimDetail(ClaimResponse):
 
 
 class PatchStatusRequest(BaseModel):
-    status: Literal["reviewed", "dismissed"]
+    status: Literal["verified", "debunked", "needs_info"]
 
 
 class ClaimsListResponse(BaseModel):
@@ -37,6 +37,26 @@ class ClaimsListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class NetworkNode(BaseModel):
+    id: int
+    claim_text: str
+    topic: str
+    status: str
+    occurrence_count: int
+    urgency_signals: bool
+
+
+class NetworkEdge(BaseModel):
+    source: int
+    target: int
+    relation: str
+
+
+class NetworkResponse(BaseModel):
+    nodes: list[NetworkNode]
+    edges: list[NetworkEdge]
 
 
 class StatsResponse(BaseModel):

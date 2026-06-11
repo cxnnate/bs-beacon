@@ -42,7 +42,7 @@ class WebSocketManager:
                 async with AsyncSessionLocal() as session:
                     rows = await session.execute(
                         text("""
-                            SELECT c.id, c.claim_text, c.category, c.temporal,
+                            SELECT c.id, c.claim_text, c.topic, c.temporal,
                                    c.checkworthy_score, c.source_attribution,
                                    c.urgency_signals, c.occurrence_count, c.status,
                                    c.first_seen_at::text AS first_seen_at,

@@ -4,6 +4,7 @@ from sqlalchemy import text
 from src.api.auth import require_auth
 from src.api.schemas import (
     ClaimsListResponse, ClaimResponse, ClaimDetail, ClaimSource, PatchStatusRequest,
+    NetworkNode, NetworkEdge, NetworkResponse,
 )
 from src.db.connection import AsyncSessionLocal
 
@@ -12,7 +13,7 @@ router = APIRouter()
 _CLAIM_COLS = """
     c.id,
     c.claim_text,
-    COALESCE(c.category, 'unknown')        AS category,
+    COALESCE(c.topic, 'unknown')           AS topic,
     COALESCE(c.temporal, 'unknown')        AS temporal,
     COALESCE(c.checkworthy_score, 0.0)     AS checkworthy_score,
     c.source_attribution,
@@ -29,7 +30,7 @@ _CLAIM_COLS = """
 @router.get("/claims", response_model=ClaimsListResponse)
 async def list_claims(
     status: Optional[str] = Query(None),
-    category: Optional[str] = Query(None),
+    topic: Optional[str] = Query(None),
     urgent: Optional[bool] = Query(None),
     search: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
@@ -41,9 +42,9 @@ async def list_claims(
     if status:
         filters.append("c.status = :status")
         params["status"] = status
-    if category:
-        filters.append("c.category = :category")
-        params["category"] = category
+    if topic:
+        filters.append("c.topic = :topic")
+        params["topic"] = topic
     if urgent is not None:
         filters.append("c.urgency_signals = :urgent")
         params["urgent"] = urgent
@@ -74,6 +75,48 @@ async def list_claims(
             items.append(ClaimResponse(**d))
 
     return ClaimsListResponse(items=items, total=total, page=page, page_size=page_size)
+
+
+# Must be declared before /claims/{claim_id} so "network" isn't parsed as an id.
+@router.get("/claims/network", response_model=NetworkResponse)
+async def claim_network(
+    days: Optional[int] = Query(None, ge=1),
+    _: str = Depends(require_auth),
+):
+    time_filter = (
+        "WHERE GREATEST(ca.last_seen_at, cb.last_seen_at) >= NOW() - make_interval(days => :days)"
+        if days else ""
+    )
+    async with AsyncSessionLocal() as session:
+        edge_rows = await session.execute(
+            text(f"""
+                SELECT cr.claim_a, cr.claim_b, cr.relation
+                FROM claim_relations cr
+                JOIN claims ca ON ca.id = cr.claim_a
+                JOIN claims cb ON cb.id = cr.claim_b
+                {time_filter}
+            """),
+            {"days": days} if days else {},
+        )
+        edges = [
+            NetworkEdge(source=r[0], target=r[1], relation=r[2])
+            for r in edge_rows.fetchall()
+        ]
+        node_ids = sorted({e.source for e in edges} | {e.target for e in edges})
+        nodes: list[NetworkNode] = []
+        if node_ids:
+            node_rows = await session.execute(
+                text("""
+                    SELECT id, claim_text, COALESCE(topic, 'unknown') AS topic,
+                           COALESCE(status, 'unreviewed') AS status,
+                           COALESCE(occurrence_count, 1) AS occurrence_count,
+                           COALESCE(urgency_signals, false) AS urgency_signals
+                    FROM claims WHERE id = ANY(:ids)
+                """),
+                {"ids": node_ids},
+            )
+            nodes = [NetworkNode(**dict(r._mapping)) for r in node_rows.fetchall()]
+    return NetworkResponse(nodes=nodes, edges=edges)
 
 
 @router.get("/claims/{claim_id}", response_model=ClaimDetail)
